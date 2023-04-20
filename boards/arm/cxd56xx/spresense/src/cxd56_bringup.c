@@ -527,7 +527,7 @@ int cxd56_bringup(void)
 
 /*
  * Where is I2C0 BMP280 setup?
- * well it's in board_sensors_initialize() and we leave it there. (Because it works!)
+ * it's in board_sensors_initialize() and we leave it there. (Because it works")
  */
 
 #ifdef CONFIG_SENSORS
