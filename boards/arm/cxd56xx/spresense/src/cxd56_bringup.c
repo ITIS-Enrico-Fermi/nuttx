@@ -113,6 +113,26 @@
 #  include <arch/chip/cisif.h>
 #endif
 
+#if defined(CONFIG_CXD56_I2C)
+#  include "cxd56_i2c.h"
+#endif
+
+#if defined(CONFIG_SPI)
+#  include "cxd56_spi.h"
+#endif
+
+#if defined(CONFIG_CXD56_I2C) && defined(CONFIG_SENSORS_VEML6070)
+#  include <nuttx/sensors/veml6070.h>
+#endif
+
+#if defined(CONFIG_CXD56_I2C) && defined(CONFIG_MPU60X0_I2C)
+#  include <nuttx/sensors/mpu60x0.h>
+#endif
+
+#if defined(CONFIG_SPI) && defined(CONFIG_RF_RFM95)
+#include <nuttx/rf/rfm95.h>
+#endif
+
 #include "spresense.h"
 
 /****************************************************************************
@@ -505,11 +525,86 @@ int cxd56_bringup(void)
     }
 #endif
 
+/*
+ * Where is I2C0 BMP280 setup?
+ * well it's in board_sensors_initialize() and we leave it there. (Because it works!)
+ */
+
 #ifdef CONFIG_SENSORS
   ret = board_sensors_initialize();
   if (ret < 0)
     {
       _err("ERROR: Failed to initialize sensors.\n");
+    }
+#endif
+
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
+
+/* REGISTER I2C0 BUS */
+#if defined(CONFIG_CXD56_I2C)
+  struct i2c_master_s *i2c;
+  /* Initialize i2c device */
+
+  i2c = cxd56_i2cbus_initialize(0);
+  if (!i2c)
+    {
+      snerr("ERROR: Failed to initialize i2c%d.\n", 0);
+      return -ENODEV;
+    }
+#endif
+
+/* REGISTER I2C0 VEML6070 */
+#if defined(CONFIG_CXD56_I2C) && defined(CONFIG_SENSORS_VEML6070)
+  snerr("Initializing VEML6070..\n");
+  ret = veml6070_register("/dev/sensor/sensor_light0", i2c, 0x38);
+  if (ret < 0)
+    {
+      snerr("Error registering VEML6070\n");
+    }
+  else 
+    {
+    snerr("VEML6070 loaded succesfully.\n");
+    }
+#endif
+
+/* REGISTER I2C0 MPU6050 */
+#if defined(CONFIG_CXD56_I2C) && defined(CONFIG_MPU60X0_I2C)
+  snerr("Initializing MPU6050..\n");
+  static struct mpu_config_s localconf;
+  struct mpu_config_s *pointer_localconf = &localconf;
+  pointer_localconf->i2c = i2c;
+  pointer_localconf->addr = 0x68;
+  ret = mpu60x0_register("/dev/sensor/sensor_gyro0", pointer_localconf);
+  if (ret < 0)
+    {
+    snerr("Error registering MPU6050\n");
+    }
+  else 
+    {
+    snerr("MPU6050 loaded succesfully.\n");
+    }
+#endif
+
+/* INIT SPI5 BUS */
+#if defined(CONFIG_SPI)
+  struct spi_dev_s *spi;
+  spi = cxd56_spibus_initialize(5);
+  if (!spi)
+    {
+      snerr("ERROR: Failed to initialize spi%d.\n", 5);
+      return -ENODEV;
+    }
+#endif
+
+/* REGISTER SPI5 RFM95 CUSTOM SPI DRIVER */
+#if defined(CONFIG_SPI) && defined(CONFIG_RF_RFM95)
+  snerr("Initializing spi5 for rfm95..\n");
+  ret = rfm95_register("/dev/radio0", spi, 0);
+  if (ret < 0)
+    {
+      _err("ERROR: Failed to register SPI Test Driver\n");
     }
 #endif
 
