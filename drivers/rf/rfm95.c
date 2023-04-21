@@ -35,6 +35,7 @@
 #include <nuttx/rf/ioctl.h>
 #include <nuttx/rf/attenuator.h>
 #include <nuttx/rf/rfm95.h>
+#include <arch/board/board.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -45,8 +46,14 @@
 /* We set SPI Frequency to 1 MHz */
 
 #ifndef CONFIG_RFM95_SPI_FREQUENCY
-#  define CONFIG_RFM95_SPI_FREQUENCY 1000000
+// We can push it to 9MHz, and maybe faster
+#  define CONFIG_RFM95_SPI_FREQUENCY 9000000
 #endif /* CONFIG_RFM95_SPI_FREQUENCY */
+
+#ifndef RFM95_RESET_PIN
+#define RFM95_RESET_PIN 10
+//TODO: check pin correctness
+#endif
 
 #  define RFM95_SPI_MODE (SPIDEV_MODE0) /* SPI Mode 0: CPOL=0,CPHA=0 */
 
@@ -98,6 +105,18 @@ static int recv_buffer_len = 0;  /* Length of SPI response */
  * Private Functions
  ****************************************************************************/
 
+/* Low level functions to expose the underlying SPI bus to rfm95_logic.c */
+
+/**
+ * Sends a reset signal down the RST GPIO pin.
+*/
+static void rfm95_reset() {
+  board_gpio_write(RFM95_RESET_PIN, 0);
+  up_mdelay(1);
+  board_gpio_write(RFM95_RESET_PIN, 1);
+  up_mdelay(10);
+}
+
 /****************************************************************************
  * Name: rfm95_configspi
  *
@@ -120,6 +139,9 @@ static inline void rfm95_configspi(FAR struct spi_dev_s *spi)
 
   SPI_HWFEATURES(spi, 0);
   SPI_SETFREQUENCY(spi, CONFIG_RFM95_SPI_FREQUENCY);
+
+  // Configure RESET pin
+  board_gpio_config(RFM95_RESET_PIN, 0, false, false, PIN_FLOAT);
 }
 
 /****************************************************************************
@@ -134,6 +156,19 @@ static int rfm95_open(FAR struct file *filep)
 {
   _info("\n");
   DEBUGASSERT(filep != NULL);
+
+  /* Get the SPI interface */
+
+  FAR struct inode *inode = filep->f_inode;
+  DEBUGASSERT(inode != NULL);
+  FAR struct rfm95_dev_s *priv = inode->i_private;
+  DEBUGASSERT(priv != NULL);
+
+  SPI_LOCK(priv->spi, true);
+  rfm95_configspi(priv->spi);
+
+  rfm95_reset();
+
   return OK;
 }
 
@@ -175,13 +210,13 @@ static ssize_t rfm95_write(FAR struct file *filep,
   FAR struct rfm95_dev_s *priv = inode->i_private;
   DEBUGASSERT(priv != NULL);
 
-  /* Lock the SPI bus and configure the SPI interface */
-
+  /* Lock the SPI bus */
+  
   DEBUGASSERT(priv->spi != NULL);
   SPI_LOCK(priv->spi, true);
-  rfm95_configspi(priv->spi);
+  //CHECK: moved SPI initialization to rfm95_open
 
-  /* Select the SPI device */
+  /* Assert CS pin of the module */
 
   SPI_SELECT(priv->spi, priv->spidev, true);
 
@@ -190,7 +225,7 @@ static ssize_t rfm95_write(FAR struct file *filep,
   SPI_EXCHANGE(priv->spi, buffer, recv_buffer, buflen);
   recv_buffer_len = buflen;
 
-  /* Deselect the SPI device */
+  /* Deassert CS pin of the module */
 
   SPI_SELECT(priv->spi, priv->spidev, false);
 
@@ -244,7 +279,9 @@ static int rfm95_ioctl(FAR struct file *filep,
 
   switch (cmd)
     {
-      /* TODO: Handle ioctl commands */
+      case RFM95_IOCTL_RESET:
+        rfm95_reset();
+        break;
 
       default:
         sninfo("Unrecognized cmd: %d\n", cmd);

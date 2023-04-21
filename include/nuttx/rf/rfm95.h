@@ -28,6 +28,8 @@
 #include <nuttx/rf/ioctl.h>
 #include <nuttx/spi/spi.h>
 
+#define RFM95_IOCTL_RESET 0
+
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
@@ -47,7 +49,7 @@ extern "C"
  *   Register the rfm95 character device as 'devpath'.
  *
  * Input Parameters:
- *   devpath - The full path to the driver to register. E.g., "/dev/att0"
+ *   devpath - The full path to the driver to register. E.g., "/dev/radio0"
  *   spi     - An instance of the SPI interface to use to communicate with
  *   spidev  - Number of the spi device (used to drive the Latch Enable pin).
  *
