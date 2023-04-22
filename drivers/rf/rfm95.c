@@ -41,17 +41,17 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-//#if defined(CONFIG_SPI) && defined(CONFIG_RF_RFM95)
+#if defined(CONFIG_SPI) && defined(CONFIG_RF_RFM95)
 
 /* We set SPI Frequency to 1 MHz */
 
-#ifndef CONFIG_RFM95_SPI_FREQUENCY
+#ifndef CONFIG_RF_RFM95_SPI_FREQUENCY
 // We can push it to 9MHz, and maybe faster
-#  define CONFIG_RFM95_SPI_FREQUENCY 9000000
+#  define CONFIG_RF_RFM95_SPI_FREQUENCY 9000000
 #endif /* CONFIG_RFM95_SPI_FREQUENCY */
 
-#ifndef RFM95_RESET_PIN
-#define RFM95_RESET_PIN 10
+#ifndef CONFIG_RF_RFM95_RESET_PIN
+#define CONFIG_RF_RFM95_RESET_PIN 10
 //TODO: check pin correctness
 #endif
 
@@ -111,9 +111,9 @@ static int recv_buffer_len = 0;  /* Length of SPI response */
  * Sends a reset signal down the RST GPIO pin.
 */
 static void rfm95_reset() {
-  board_gpio_write(RFM95_RESET_PIN, 0);
+  board_gpio_write(CONFIG_RF_RFM95_RESET_PIN, 0);
   up_mdelay(1);
-  board_gpio_write(RFM95_RESET_PIN, 1);
+  board_gpio_write(CONFIG_RF_RFM95_RESET_PIN, 1);
   up_mdelay(10);
 }
 
@@ -138,10 +138,10 @@ static inline void rfm95_configspi(FAR struct spi_dev_s *spi)
   /* Set SPI Hardware Features and Frequency */
 
   SPI_HWFEATURES(spi, 0);
-  SPI_SETFREQUENCY(spi, CONFIG_RFM95_SPI_FREQUENCY);
+  SPI_SETFREQUENCY(spi, CONFIG_RF_RFM95_SPI_FREQUENCY);
 
   // Configure RESET pin
-  board_gpio_config(RFM95_RESET_PIN, 0, false, false, PIN_FLOAT);
+  board_gpio_config(CONFIG_RF_RFM95_RESET_PIN, 0, false, false, PIN_FLOAT);
 }
 
 /****************************************************************************
@@ -157,6 +157,10 @@ static int rfm95_open(FAR struct file *filep)
   _info("\n");
   DEBUGASSERT(filep != NULL);
 
+  /* Check if kernel configs work! */
+  sninfo("SPI freq: %d\n", CONFIG_RF_RFM95_SPI_FREQUENCY);
+  sninfo("SPI freq: %d\n", CONFIG_RF_RFM95_RESET_PIN);
+
   /* Get the SPI interface */
 
   FAR struct inode *inode = filep->f_inode;
@@ -166,6 +170,7 @@ static int rfm95_open(FAR struct file *filep)
 
   SPI_LOCK(priv->spi, true);
   rfm95_configspi(priv->spi);
+  SPI_LOCK(priv->spi, false); // closing lock is important :)
 
   rfm95_reset();
 
@@ -346,4 +351,4 @@ int rfm95_register(FAR const char *devpath,
   return ret;
 }
 
-//#endif
+#endif

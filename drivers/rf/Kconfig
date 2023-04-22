@@ -26,4 +26,20 @@ config RF_RFM95
 	---help---
 		Enable SPI RFM95 Driver.
 
+if RF_RFM95
+
+config RF_RFM95_RESET_PIN
+	int "RFM95 Reset pin number"
+	default 1
+	---help---
+		Select your board pin connected to RST RFM95 pin.
+
+config RF_RFM95_SPI_FREQUENCY
+	int "RFM95 SPI bus frequency"
+	default 9000000
+	---help---
+		Select your board pin connected to RST RFM95 pin.
+
+endif # RF_RFM95
+
 endif # DRIVERS_RF
