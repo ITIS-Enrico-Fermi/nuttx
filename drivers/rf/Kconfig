@@ -28,6 +28,12 @@ config RF_RFM95
 
 if RF_RFM95
 
+config RF_RFM95_SPI_CS_PIN
+	int "RFM95 SPI CS pin number"
+	default 2
+	---help---
+		Select your board pin dedicated to SPI CS pin for RFM95.
+
 config RF_RFM95_RESET_PIN
 	int "RFM95 Reset pin number"
 	default 1

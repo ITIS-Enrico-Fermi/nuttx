@@ -20,7 +20,6 @@
 /****************************************************************************
  * Included Files
  ****************************************************************************/
-
 #include <nuttx/config.h>
 
 #include <stdlib.h>
@@ -43,7 +42,10 @@
 
 #if defined(CONFIG_SPI) && defined(CONFIG_RF_RFM95)
 
-/* We set SPI Frequency to 1 MHz */
+#ifndef CONFIG_RF_RFM95_SPI_CS_PIN
+/* UART2_RDX for Sony Spresense */
+#  define CONFIG_RF_RFM95_SPI_CS_PIN 68
+#endif /* CONFIG_RF_RFM95_SPI_CS_PIN */
 
 #ifndef CONFIG_RF_RFM95_SPI_FREQUENCY
 // We can push it to 9MHz, and maybe faster
@@ -51,8 +53,8 @@
 #endif /* CONFIG_RFM95_SPI_FREQUENCY */
 
 #ifndef CONFIG_RF_RFM95_RESET_PIN
-#define CONFIG_RF_RFM95_RESET_PIN 10
-//TODO: check pin correctness
+/* UART2_TDX for Sony Spresense */
+#define CONFIG_RF_RFM95_RESET_PIN 67
 #endif
 
 #  define RFM95_SPI_MODE (SPIDEV_MODE0) /* SPI Mode 0: CPOL=0,CPHA=0 */
@@ -140,7 +142,8 @@ static inline void rfm95_configspi(FAR struct spi_dev_s *spi)
   SPI_HWFEATURES(spi, 0);
   SPI_SETFREQUENCY(spi, CONFIG_RF_RFM95_SPI_FREQUENCY);
 
-  // Configure RESET pin
+  // Configure CS and RESET pin
+  board_gpio_config(CONFIG_RF_RFM95_SPI_CS_PIN, 0, false, false, PIN_FLOAT);
   board_gpio_config(CONFIG_RF_RFM95_RESET_PIN, 0, false, false, PIN_FLOAT);
 }
 
@@ -158,8 +161,9 @@ static int rfm95_open(FAR struct file *filep)
   DEBUGASSERT(filep != NULL);
 
   /* Check if kernel configs work! */
+  sninfo("SPI CS pin: %d\n", CONFIG_RF_RFM95_SPI_CS_PIN);
   sninfo("SPI freq: %d\n", CONFIG_RF_RFM95_SPI_FREQUENCY);
-  sninfo("SPI freq: %d\n", CONFIG_RF_RFM95_RESET_PIN);
+  sninfo("SPI reset pin: %d\n", CONFIG_RF_RFM95_RESET_PIN);
 
   /* Get the SPI interface */
 
@@ -220,9 +224,8 @@ static ssize_t rfm95_write(FAR struct file *filep,
   DEBUGASSERT(priv->spi != NULL);
   SPI_LOCK(priv->spi, true);
   //CHECK: moved SPI initialization to rfm95_open
-
   /* Assert CS pin of the module */
-
+  board_gpio_write(CONFIG_RF_RFM95_SPI_CS_PIN, 0);
   SPI_SELECT(priv->spi, priv->spidev, true);
 
   /* Transmit buffer to SPI device and receive the response */
@@ -233,7 +236,7 @@ static ssize_t rfm95_write(FAR struct file *filep,
   /* Deassert CS pin of the module */
 
   SPI_SELECT(priv->spi, priv->spidev, false);
-
+  board_gpio_write(CONFIG_RF_RFM95_SPI_CS_PIN, 1);
   /* Unlock the SPI bus */
 
   SPI_LOCK(priv->spi, false);
@@ -334,11 +337,10 @@ int rfm95_register(FAR const char *devpath,
 
   priv->spi    = spi;
   priv->spidev = spidev;
-
   /* Clear the LE pin */
 
   SPI_SELECT(priv->spi, priv->spidev, false);
-
+  board_gpio_write(CONFIG_RF_RFM95_SPI_CS_PIN, 1);
   /* Register the character driver */
 
   ret = register_driver(devpath, &g_rfm95_fops, 0666, priv);
