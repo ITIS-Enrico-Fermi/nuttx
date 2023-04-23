@@ -87,36 +87,18 @@
 #define TIMEOUT_RESET                  (100)
 
 /* IOCTL DEFINITION */
-#define RFM95_IOCTL_RESET 0
+#define RFM95_IOCTL_INIT 0
 
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
 
-void rfm95_reset(void);
-void rfm95_explicit_header_mode(void);
-void rfm95_implicit_header_mode(int size);
-void rfm95_idle(void);
-void rfm95_sleep(void); 
-void rfm95_receive(void);
-void rfm95_set_tx_power(int level);
-void rfm95_set_frequency(long frequency);
-void rfm95_set_spreading_factor(int sf);
-void rfm95_set_bandwidth(long sbw);
-void rfm95_set_coding_rate(int denominator);
-void rfm95_set_preamble_length(long length);
-void rfm95_set_sync_word(int sw);
-void rfm95_enable_crc(void);
-void rfm95_disable_crc(void);
-int rfm95_init(const char *dev_path);
-void rfm95_send_packet(const uint8_t *buf, int size);
-int rfm95_receive_packet(uint8_t *buf, int size);
-int rfm95_received(void);
-int rfm95_packet_rssi(void);
-float rfm95_packet_snr(void);
-void rfm95_close(void);
-int rfm95_initialized(void);
-void rfm95_dump_registers(void);
+int rfm95_read_reg(FAR struct spi_dev_s *spi, int reg);
+void rfm95_write_reg(FAR struct spi_dev_s *spi, int reg, int val);
+static void rfm95_reset();
+static void rfm95_init(FAR struct file *filep);
+void rfm95_send_packet(FAR struct spi_dev_s *spi, const uint8_t *buf, int size);
+static inline void rfm95_configspi(FAR struct spi_dev_s *spi);
 
 #ifdef __cplusplus
 #define EXTERN extern "C"

@@ -109,14 +109,132 @@ static int recv_buffer_len = 0;  /* Length of SPI response */
 
 /* Low level functions to expose the underlying SPI bus to rfm95_logic.c */
 
-/**
- * Sends a reset signal down the RST GPIO pin.
-*/
+int rfm95_read_reg(FAR struct spi_dev_s *spi, int reg) {
+   uint8_t out[2] = { reg, 0xff };
+   uint8_t in[2];
+
+   /* Transmit buffer to SPI device and receive the response */
+   SPI_EXCHANGE(spi, out, in, 2);
+   recv_buffer_len = 2;
+   return in[1];
+}
+
+void rfm95_write_reg(FAR struct spi_dev_s *spi, int reg, int val) {
+   uint8_t out[2] = { 0x80 | reg, val };
+   uint8_t in[2];
+
+   /* Transmit buffer to SPI device */
+   SPI_EXCHANGE(spi, out, in, 2);
+}
+
+/* Sends a reset signal down the RST GPIO pin */
 static void rfm95_reset() {
   board_gpio_write(CONFIG_RF_RFM95_RESET_PIN, 0);
   up_mdelay(1);
   board_gpio_write(CONFIG_RF_RFM95_RESET_PIN, 1);
   up_mdelay(10);
+}
+
+static void rfm95_init(FAR struct file *filep) {
+  
+  DEBUGASSERT(filep  != NULL);
+  
+  /* Get the SPI interface */
+  FAR struct inode *inode = filep->f_inode;
+  DEBUGASSERT(inode != NULL);
+  FAR struct rfm95_dev_s *priv = inode->i_private;
+  DEBUGASSERT(priv != NULL);
+
+  /* Configure reset pin */
+  board_gpio_config(CONFIG_RF_RFM95_RESET_PIN, 0, false, false, PIN_FLOAT);
+  rfm95_reset();
+  /* Configure cs spi pin */
+  board_gpio_config(CONFIG_RF_RFM95_SPI_CS_PIN, 0, false, false, PIN_FLOAT);
+
+  /* Lock the SPI bus */
+  DEBUGASSERT(priv->spi != NULL);
+  SPI_LOCK(priv->spi, true);
+  /* Enable CS pin */
+  board_gpio_write(CONFIG_RF_RFM95_SPI_CS_PIN, 0);
+  SPI_SELECT(priv->spi, priv->spidev, true);
+
+  rfm95_configspi(priv->spi);
+
+  /*
+  * Check version.
+  */
+  uint8_t version;
+  uint8_t i = 0;
+  while(i++ < TIMEOUT_RESET) {
+    version = rfm95_read_reg(priv->spi, REG_VERSION);
+    if(version == 0x12) break;
+    up_mdelay(2);
+  }
+  DEBUGASSERT(i < TIMEOUT_RESET + 1); // at the end of the loop above, the max value i can reach is TIMEOUT_RESET + 1
+  _info("Version: %d\n", version);
+
+  /*
+  * Default configuration.
+  */
+  rfm95_write_reg(priv->spi, REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_SLEEP); // sleep mode
+  rfm95_write_reg(priv->spi, REG_FIFO_RX_BASE_ADDR, 0);
+  rfm95_write_reg(priv->spi, REG_FIFO_TX_BASE_ADDR, 0);
+  rfm95_write_reg(priv->spi, REG_LNA, rfm95_read_reg(priv->spi, REG_LNA) | 0x03);
+  rfm95_write_reg(priv->spi, REG_MODEM_CONFIG_3, 0x04);
+  uint8_t level = 17; /* TODO ADD KERNEL CONFIG */
+  if (level < 2) level = 2;
+  else if (level > 17) level = 17;
+  rfm95_write_reg(priv->spi, REG_PA_CONFIG, PA_BOOST | (level - 2)); // set tx power
+
+  /* Setup transmission frequency */
+  int frequency = 868000000;  /* TODO ADD KERNEL CONFIG */
+  uint64_t frf = ((uint64_t)frequency << 19) / 32000000;
+
+  rfm95_write_reg(priv->spi, REG_FRF_MSB, (uint8_t)(frf >> 16));
+  rfm95_write_reg(priv->spi, REG_FRF_MID, (uint8_t)(frf >> 8));
+  rfm95_write_reg(priv->spi, REG_FRF_LSB, (uint8_t)(frf >> 0));
+
+  /* Set sync word 
+  * 0x00 = none
+  */
+  int syncw = 0x00; /* TODO ADD KERNEL CONFIG */
+  if (syncw != 0x00)
+  {
+    rfm95_write_reg(priv->spi, REG_SYNC_WORD, syncw);
+  }
+
+  /* Add the rest of the config.. */
+
+  rfm95_write_reg(priv->spi, REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_STDBY); // idle mode
+
+  board_gpio_write(CONFIG_RF_RFM95_SPI_CS_PIN, 1);
+  SPI_SELECT(priv->spi, priv->spidev, false);
+  SPI_LOCK(priv->spi, false);
+}
+
+void rfm95_send_packet(FAR struct spi_dev_s *spi, const uint8_t *buf, int size) {
+   /*
+    * Transfer data to radio.
+    */
+   rfm95_write_reg(spi, REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_STDBY); // idle mode
+   rfm95_write_reg(spi, REG_FIFO_ADDR_PTR, 0);
+
+   for(int i=0; i<size; i++) 
+      rfm95_write_reg(spi, REG_FIFO, *buf++);
+   
+   rfm95_write_reg(spi, REG_PAYLOAD_LENGTH, size);
+   
+   /*
+    * Start transmission and wait for conclusion.
+    */
+   rfm95_write_reg(spi, REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_TX);
+   while((rfm95_read_reg(spi, REG_IRQ_FLAGS) & IRQ_TX_DONE_MASK) == 0)
+   {
+      up_mdelay(100);
+   }
+   
+
+   rfm95_write_reg(spi, REG_IRQ_FLAGS, IRQ_TX_DONE_MASK);
 }
 
 /****************************************************************************
@@ -141,10 +259,6 @@ static inline void rfm95_configspi(FAR struct spi_dev_s *spi)
 
   SPI_HWFEATURES(spi, 0);
   SPI_SETFREQUENCY(spi, CONFIG_RF_RFM95_SPI_FREQUENCY);
-
-  // Configure CS and RESET pin
-  board_gpio_config(CONFIG_RF_RFM95_SPI_CS_PIN, 0, false, false, PIN_FLOAT);
-  board_gpio_config(CONFIG_RF_RFM95_RESET_PIN, 0, false, false, PIN_FLOAT);
 }
 
 /****************************************************************************
@@ -176,8 +290,6 @@ static int rfm95_open(FAR struct file *filep)
   rfm95_configspi(priv->spi);
   SPI_LOCK(priv->spi, false); // closing lock is important :)
 
-  rfm95_reset();
-
   return OK;
 }
 
@@ -200,7 +312,7 @@ static int rfm95_close(FAR struct file *filep)
  * Name: rfm95_write
  *
  * Description:
- *   Write the buffer to the device.
+ *   Transmit a message.
  ****************************************************************************/
 
 static ssize_t rfm95_write(FAR struct file *filep,
@@ -223,18 +335,14 @@ static ssize_t rfm95_write(FAR struct file *filep,
   
   DEBUGASSERT(priv->spi != NULL);
   SPI_LOCK(priv->spi, true);
-  //CHECK: moved SPI initialization to rfm95_open
+
   /* Assert CS pin of the module */
   board_gpio_write(CONFIG_RF_RFM95_SPI_CS_PIN, 0);
   SPI_SELECT(priv->spi, priv->spidev, true);
 
-  /* Transmit buffer to SPI device and receive the response */
-
-  SPI_EXCHANGE(priv->spi, buffer, recv_buffer, buflen);
-  recv_buffer_len = buflen;
+  rfm95_send_packet(priv->spi, (uint8_t)buffer, buflen);
 
   /* Deassert CS pin of the module */
-
   SPI_SELECT(priv->spi, priv->spidev, false);
   board_gpio_write(CONFIG_RF_RFM95_SPI_CS_PIN, 1);
   /* Unlock the SPI bus */
@@ -287,8 +395,8 @@ static int rfm95_ioctl(FAR struct file *filep,
 
   switch (cmd)
     {
-      case RFM95_IOCTL_RESET:
-        rfm95_reset();
+      case RFM95_IOCTL_INIT:
+        rfm95_init(filep);
         break;
 
       default:
