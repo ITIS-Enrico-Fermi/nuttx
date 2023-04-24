@@ -151,6 +151,18 @@ static void rfm95_reset() {
   up_mdelay(10);
 }
 
+/*
+* Init step:
+* 1. Reret on RST pin
+* 2. SPI config
+* 3. Check version
+* 4. Sleep mode
+* 5. Default configuration
+* 6. TX power
+* 7. TX frequency
+* 8. Sync word
+* 9. Idle mode
+*/
 static void rfm95_init(FAR struct file *filep) {
   
   DEBUGASSERT(filep  != NULL);
@@ -193,6 +205,7 @@ static void rfm95_init(FAR struct file *filep) {
   * Default configuration.
   */
   rfm95_write_reg(priv->spi, REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_SLEEP); // sleep mode
+  _info("Entering in sleep mode for def config\n");
   rfm95_write_reg(priv->spi, REG_FIFO_RX_BASE_ADDR, 0);
   rfm95_write_reg(priv->spi, REG_FIFO_TX_BASE_ADDR, 0);
   rfm95_write_reg(priv->spi, REG_LNA, rfm95_read_reg(priv->spi, REG_LNA) | 0x03);
@@ -201,6 +214,7 @@ static void rfm95_init(FAR struct file *filep) {
   if (level < 2) level = 2;
   else if (level > 17) level = 17;
   rfm95_write_reg(priv->spi, REG_PA_CONFIG, PA_BOOST | (level - 2)); // set tx power
+  _info("Configured TX power: %d\n", level);
 
   /* Setup transmission frequency */
   int frequency = CONFIG_RF_RFM95_TX_FREQ;
@@ -209,6 +223,7 @@ static void rfm95_init(FAR struct file *filep) {
   rfm95_write_reg(priv->spi, REG_FRF_MSB, (uint8_t)(frf >> 16));
   rfm95_write_reg(priv->spi, REG_FRF_MID, (uint8_t)(frf >> 8));
   rfm95_write_reg(priv->spi, REG_FRF_LSB, (uint8_t)(frf >> 0));
+  _info("Configured TX freq: %d\n", frequency);
 
   /* Set sync word 
   * 0x00 = none
@@ -217,11 +232,14 @@ static void rfm95_init(FAR struct file *filep) {
   if (syncw != 0x00)
   {
     rfm95_write_reg(priv->spi, REG_SYNC_WORD, syncw);
+    _info("Configured syncword: %d\n", syncw);
   }
 
   /* Add the rest of the config.. */
 
+  /* Back to idle mode */
   rfm95_write_reg(priv->spi, REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_STDBY); // idle mode
+  _info("Init finished, back to idle mode\n");
 
   board_gpio_write(CONFIG_RF_RFM95_SPI_CS_PIN, 1);
   SPI_SELECT(priv->spi, priv->spidev, false);
@@ -242,6 +260,7 @@ void rfm95_send_packet(FAR struct spi_dev_s *spi, const uint8_t *buf, int size) 
    
    /*
     * Start transmission and wait for conclusion.
+    * This is done via polling method (interrupt on DIO0 would be much better)
     */
    rfm95_write_reg(spi, REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_TX);
    while((rfm95_read_reg(spi, REG_IRQ_FLAGS) & IRQ_TX_DONE_MASK) == 0)
