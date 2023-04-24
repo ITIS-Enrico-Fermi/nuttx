@@ -57,6 +57,22 @@
 #define CONFIG_RF_RFM95_RESET_PIN 67
 #endif
 
+#ifndef CONFIG_RF_RFM95_TX_FREQ
+/* Transmission frequency for LoRa 
+*  Default: 868Mhz */
+#define CONFIG_RF_RFM95_TX_FREQ 868000000
+#endif
+
+#ifndef CONFIG_RF_RFM95_TX_POWER
+#define CONFIG_RF_RFM95_TX_POWER 17
+#endif
+
+#ifndef CONFIG_RF_RFM95_SYNC_WORD
+/* Transmission frequency for LoRa 
+*  0x00 for none */
+#define CONFIG_RF_RFM95_SYNC_WORD 0
+#endif
+
 #  define RFM95_SPI_MODE (SPIDEV_MODE0) /* SPI Mode 0: CPOL=0,CPHA=0 */
 
 /****************************************************************************
@@ -181,13 +197,13 @@ static void rfm95_init(FAR struct file *filep) {
   rfm95_write_reg(priv->spi, REG_FIFO_TX_BASE_ADDR, 0);
   rfm95_write_reg(priv->spi, REG_LNA, rfm95_read_reg(priv->spi, REG_LNA) | 0x03);
   rfm95_write_reg(priv->spi, REG_MODEM_CONFIG_3, 0x04);
-  uint8_t level = 17; /* TODO ADD KERNEL CONFIG */
+  uint8_t level = CONFIG_RF_RFM95_TX_POWER;
   if (level < 2) level = 2;
   else if (level > 17) level = 17;
   rfm95_write_reg(priv->spi, REG_PA_CONFIG, PA_BOOST | (level - 2)); // set tx power
 
   /* Setup transmission frequency */
-  int frequency = 868000000;  /* TODO ADD KERNEL CONFIG */
+  int frequency = CONFIG_RF_RFM95_TX_FREQ;
   uint64_t frf = ((uint64_t)frequency << 19) / 32000000;
 
   rfm95_write_reg(priv->spi, REG_FRF_MSB, (uint8_t)(frf >> 16));
@@ -197,7 +213,7 @@ static void rfm95_init(FAR struct file *filep) {
   /* Set sync word 
   * 0x00 = none
   */
-  int syncw = 0x00; /* TODO ADD KERNEL CONFIG */
+  int syncw = CONFIG_RF_RFM95_SYNC_WORD;
   if (syncw != 0x00)
   {
     rfm95_write_reg(priv->spi, REG_SYNC_WORD, syncw);
@@ -274,10 +290,13 @@ static int rfm95_open(FAR struct file *filep)
   _info("\n");
   DEBUGASSERT(filep != NULL);
 
-  /* Check if kernel configs work! */
-  sninfo("SPI CS pin: %d\n", CONFIG_RF_RFM95_SPI_CS_PIN);
-  sninfo("SPI freq: %d\n", CONFIG_RF_RFM95_SPI_FREQUENCY);
-  sninfo("SPI reset pin: %d\n", CONFIG_RF_RFM95_RESET_PIN);
+  /* Debug info */
+  _info("SPI reset pin: %d\n", CONFIG_RF_RFM95_RESET_PIN);
+  _info("SPI CS pin: %d\n", CONFIG_RF_RFM95_SPI_CS_PIN);
+  _info("SPI freq: %d\n", CONFIG_RF_RFM95_SPI_FREQUENCY);
+  _info("TX frequency: %d\n", CONFIG_RF_RFM95_TX_FREQ);
+  _info("TX power: %d\n", CONFIG_RF_RFM95_TX_POWER);
+  _info("Sync word: %d\n", CONFIG_RF_RFM95_SYNC_WORD);
 
   /* Get the SPI interface */
 
@@ -320,7 +339,7 @@ static ssize_t rfm95_write(FAR struct file *filep,
                                size_t buflen)
 {
   _info("buflen=%u\n", buflen);
-  DEBUGASSERT(buflen <= sizeof(recv_buffer));  /* TODO: Range eheck */
+  DEBUGASSERT(buflen <= sizeof(recv_buffer));
   DEBUGASSERT(buffer != NULL);
   DEBUGASSERT(filep  != NULL);
 
@@ -369,7 +388,7 @@ static ssize_t rfm95_read(FAR struct file *filep, FAR char *buffer,
   /* Copy the SPI response to the buffer */
 
   DEBUGASSERT(recv_buffer_len >= 0);
-  DEBUGASSERT(recv_buffer_len <= buflen);  /* TODO: Range check */
+  DEBUGASSERT(recv_buffer_len <= buflen);
   memcpy(buffer, recv_buffer, recv_buffer_len);
 
   /* Return the number of bytes read */
