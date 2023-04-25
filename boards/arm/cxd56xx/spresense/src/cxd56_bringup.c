@@ -133,6 +133,10 @@
 #include <nuttx/rf/rfm95.h>
 #endif
 
+#ifdef defined(CONFIG_VIDEO_ISX012)
+#include <nuttx/video/video.h>
+#endif
+
 #include "spresense.h"
 
 /****************************************************************************
@@ -557,7 +561,7 @@ int cxd56_bringup(void)
 
 /* REGISTER I2C0 VEML6070 */
 #if defined(CONFIG_CXD56_I2C) && defined(CONFIG_SENSORS_VEML6070)
-  snerr("Initializing VEML6070..\n");
+  sninfo("Initializing VEML6070..\n");
   ret = veml6070_register("/dev/sensor/sensor_light0", i2c, 0x38);
   if (ret < 0)
     {
@@ -571,7 +575,7 @@ int cxd56_bringup(void)
 
 /* REGISTER I2C0 MPU6050 */
 #if defined(CONFIG_CXD56_I2C) && defined(CONFIG_MPU60X0_I2C)
-  snerr("Initializing MPU6050..\n");
+  sninfo("Initializing MPU6050..\n");
   static struct mpu_config_s localconf;
   struct mpu_config_s *pointer_localconf = &localconf;
   pointer_localconf->i2c = i2c;
@@ -600,13 +604,24 @@ int cxd56_bringup(void)
 
 /* REGISTER SPI5 RFM95 CUSTOM SPI DRIVER */
 #if defined(CONFIG_SPI) && defined(CONFIG_RF_RFM95)
-  snerr("Initializing spi5 for rfm95..\n");
+  sninfo("Initializing spi5 for rfm95..\n");
   ret = rfm95_register("/dev/radio0", spi, 0);
   if (ret < 0)
     {
-      _err("ERROR: Failed to register SPI Test Driver\n");
+      snerr("ERROR: Failed to register SPI RFM95 Driver\n");
     }
 #endif
+
+/* REGISTER I2C CAMERA */
+#ifdef CONFIG_VIDEO_ISX012
+  vinfo("Initializing camera0..\n");
+  ret = video_initialize("/dev/camera0");
+  if (ret != 0)
+  {
+    verr("ERROR: Failed to initialize video: errno = %d\n", errno);
+    return ERROR;
+  }
+#endif /* CONFIG_VIDEO_ISX012 */
 
 #ifdef CONFIG_VIDEO_FB
   ret = fb_register(0, 0);
