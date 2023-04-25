@@ -204,7 +204,9 @@ static void rfm95_init(FAR struct file *filep) {
   /*
   * Default configuration.
   */
+  spiinfo("Reading REG_OP_MODE before write: %d\n", rfm95_read_reg(priv->spi, REG_OP_MODE));
   rfm95_write_reg(priv->spi, REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_SLEEP); // sleep mode
+  spiinfo("Reading REG_OP_MODE after write: %d\n", rfm95_read_reg(priv->spi, REG_OP_MODE));
   _info("Entering in sleep mode for def config\n");
   rfm95_write_reg(priv->spi, REG_FIFO_RX_BASE_ADDR, 0);
   rfm95_write_reg(priv->spi, REG_FIFO_TX_BASE_ADDR, 0);
@@ -224,6 +226,14 @@ static void rfm95_init(FAR struct file *filep) {
   rfm95_write_reg(priv->spi, REG_FRF_MID, (uint8_t)(frf >> 8));
   rfm95_write_reg(priv->spi, REG_FRF_LSB, (uint8_t)(frf >> 0));
   _info("Configured TX freq: %d\n", frequency);
+
+  /* Coding rate 4 TODO ADD KERNEL CONFIG*/
+  int denominator = 4;
+  if (denominator < 5) denominator = 5;
+  else if (denominator > 8) denominator = 8;
+  int cr = denominator - 4;
+  rfm95_write_reg(priv->spi, REG_MODEM_CONFIG_1, (rfm95_read_reg(priv->spi, REG_MODEM_CONFIG_1) & 0xf1) | (cr << 1));
+  _info("Configured coding rate: %d\n", denominator);
 
   /* Set sync word 
   * 0x00 = none
@@ -378,7 +388,7 @@ static ssize_t rfm95_write(FAR struct file *filep,
   board_gpio_write(CONFIG_RF_RFM95_SPI_CS_PIN, 0);
   SPI_SELECT(priv->spi, priv->spidev, true);
 
-  rfm95_send_packet(priv->spi, (uint8_t)buffer, buflen);
+  rfm95_send_packet(priv->spi, (uint8_t *)buffer, buflen);
 
   /* Deassert CS pin of the module */
   SPI_SELECT(priv->spi, priv->spidev, false);
