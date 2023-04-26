@@ -133,7 +133,7 @@
 #include <nuttx/rf/rfm95.h>
 #endif
 
-#ifdef defined(CONFIG_VIDEO_ISX012)
+#if defined(CONFIG_VIDEO_ISX012)
 #include <nuttx/video/video.h>
 #endif
 

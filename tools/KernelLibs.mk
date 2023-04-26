@@ -118,6 +118,12 @@ ifeq ($(CONFIG_OPENAMP),y)
 NUTTXLIBS += staging$(DELIM)libopenamp$(LIBEXT)
 endif
 
+# Add ISXCAMERA library
+
+ifeq ($(CONFIG_LIBISXCAMERA),y)
+NUTTXLIBS += staging$(DELIM)libisxcamera$(LIBEXT)
+endif
+
 # Add libraries for board common support
 
 ifeq ($(CONFIG_ARCH_BOARD_COMMON),y)

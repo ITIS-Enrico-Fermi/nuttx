@@ -1,0 +1,20 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+menuconfig LIBISXCAMERA
+	bool "Libisxcamera utily"
+	default n
+	---help---
+		Enable custom functions for easy camera setup
+
+if LIBISXCAMERA
+
+config LIBISXCAMERA_DEBUG
+	bool "Libisxcamera debugging"
+	default n
+	---help---
+		This option does nothing
+
+endif # LIBISXCAMERA
