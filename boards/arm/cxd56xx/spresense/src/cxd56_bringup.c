@@ -558,7 +558,7 @@ int cxd56_bringup(void)
 /* REGISTER I2C0 VEML6070 */
 #if defined(CONFIG_CXD56_I2C) && defined(CONFIG_SENSORS_VEML6070)
   snerr("Initializing VEML6070..\n");
-  ret = veml6070_register("/dev/sensor/sensor_light0", i2c, 0x38);
+  ret = veml6070_register("/dev/sensor/sensor_uv0", i2c, 0x38);
   if (ret < 0)
     {
       snerr("Error registering VEML6070\n");
