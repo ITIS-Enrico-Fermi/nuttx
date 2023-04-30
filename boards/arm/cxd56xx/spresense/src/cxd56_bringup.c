@@ -615,7 +615,7 @@ int cxd56_bringup(void)
 /* REGISTER I2C CAMERA */
 #ifdef CONFIG_VIDEO_ISX012
   vinfo("Initializing camera0..\n");
-  ret = video_initialize("/dev/camera0");
+  ret = video_initialize("/dev/sensor/sensor_camera0");
   if (ret != 0)
   {
     verr("ERROR: Failed to initialize video: errno = %d\n", errno);
