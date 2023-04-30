@@ -143,6 +143,12 @@ else
 CLEANDIRS += libs$(DELIM)libdsp
 endif
 
+ifeq ($(CONFIG_LIBISXCAMERA),y)
+KERNDEPDIRS += libs$(DELIM)libisxcamera
+else
+CLEANDIRS += libs$(DELIM)libisxcamera
+endif
+
 # Add networking directories to KERNDEPDIRS and CLEANDIRS
 
 ifeq ($(CONFIG_NET),y)

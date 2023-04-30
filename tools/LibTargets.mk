@@ -208,6 +208,12 @@ libs$(DELIM)libdsp$(DELIM)libdsp$(LIBEXT): pass2dep
 staging$(DELIM)libdsp$(LIBEXT): libs$(DELIM)libdsp$(DELIM)libdsp$(LIBEXT)
 	$(Q) $(call INSTALL_LIB,$<,$@)
 
+libs$(DELIM)libisxcamera$(DELIM)libisxcamera$(LIBEXT): pass2dep
+	$(Q) $(MAKE) -C libs$(DELIM)libisxcamera libisxcamera$(LIBEXT) EXTRAFLAGS="$(EXTRAFLAGS)"
+
+staging$(DELIM)libisxcamera$(LIBEXT): libs$(DELIM)libisxcamera$(DELIM)libisxcamera$(LIBEXT)
+	$(Q) $(call INSTALL_LIB,$<,$@)
+
 ifeq ($(CONFIG_BUILD_FLAT),y)
 $(APPDIR)$(DELIM)libapps$(LIBEXT): pass2dep
 else
