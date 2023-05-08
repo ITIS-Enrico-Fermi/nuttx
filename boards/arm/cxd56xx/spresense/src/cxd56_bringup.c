@@ -129,6 +129,16 @@
 #  include <nuttx/sensors/mpu60x0.h>
 #endif
 
+#if defined (CONFIG_MMCSD) && defined (CONFIG_MMCSD_SPI)
+#  include <nuttx/mmcsd.h>
+#  include <nuttx/config.h>
+#  include <debug.h>
+#  include <nuttx/board.h>
+#  include <nuttx/fs/fs.h>
+#  include "cxd56_spi.h"
+#  include "cxd56_gpio.h"
+#endif
+
 #if defined(CONFIG_SPI) && defined(CONFIG_RF_RFM95)
 #include <nuttx/rf/rfm95.h>
 #endif
@@ -597,9 +607,36 @@ int cxd56_bringup(void)
   spi = cxd56_spibus_initialize(5);
   if (!spi)
     {
-      snerr("ERROR: Failed to initialize spi%d.\n", 5);
+      spierr("ERROR: Failed to initialize spi%d.\n", 5);
       return -ENODEV;
     }
+#endif
+
+#if defined (CONFIG_MMCSD) && defined (CONFIG_MMCSD_SPI)
+  /* Enable cs of sd card */
+  finfo("Enabling SD card CS pin\n");
+  board_gpio_write(PIN_UART2_RTS, 0);
+  usleep(10);
+  board_gpio_write(PIN_UART2_RTS, 1);
+
+  /* Get the SPI driver instance for the SD chip select */
+  finfo("Initializing SPI for the MMC/SD slot\n");
+
+  ret = mmcsd_spislotinitialize(0, 0, spi);
+  if (ret < 0)
+    {
+      ferr("ERROR: Failed to bind SPI device to MMC/SD slot %d: %d\n",
+           0, ret);
+      return ret;
+    }
+
+  /* Mount filesystem */
+  ret = nx_mount("/dev/mmcsd0", "/mnt/sd0", "vfat", 0, NULL);
+  if (ret < 0)
+    {
+      _err("ERROR: Failed to mount the SDCARD. %d\n", ret);
+    }
+
 #endif
 
 /* REGISTER SPI5 RFM95 CUSTOM SPI DRIVER */
