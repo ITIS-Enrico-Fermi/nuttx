@@ -341,7 +341,12 @@ int rfm95_init(void) {
     if(version == 0x12) break;
     up_mdelay(2);
   }
-  assert(i <= TIMEOUT_RESET + 1); // at the end of the loop above, the max value i can reach is TIMEOUT_RESET + 1
+  /* Can't read rfm95 version, return ERROR */
+  if(i > TIMEOUT_RESET)
+  {
+    return ERROR;
+  }
+  _info("Succesfully checked rfm95 version: 0x12\n");
 
   /*
   * Default configuration.
