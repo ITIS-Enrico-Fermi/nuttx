@@ -36,6 +36,7 @@
  ****************************************************************************/
 
 #define IMAGE_FILENAME_LEN (32)
+#define MISSING_INIT_ERROR -37
 
 /****************************************************************************
  * Private Data
@@ -349,6 +350,10 @@ int release_image(int fd)
 int start_capture(int cam_fd)
 {
   int ret;
+  if (!is_initialized)
+  {
+    return MISSING_INIT_ERROR;
+  }
 
   if (capture_type == V4L2_BUF_TYPE_STILL_CAPTURE)
   {
@@ -373,6 +378,10 @@ int start_capture(int cam_fd)
 int stop_capture(int cam_fd)
 {
   int ret;
+  if (!is_initialized)
+  {
+    return MISSING_INIT_ERROR;
+  }
 
   if (capture_type == V4L2_BUF_TYPE_STILL_CAPTURE)
   {
@@ -503,13 +512,17 @@ int camlib_init(int cam_fd)
 
 void camlib_clear(void)
 {
+  is_initialized = false;
   free_buffer(buffers_video, VIDEO_BUFNUM);
   free_buffer(buffers_still, STILL_BUFNUM);
 }
 
 int shoot_photo(int cam_fd)
 {
-  DEBUGASSERT(is_initialized);
+  if (!is_initialized)
+  {
+    return MISSING_INIT_ERROR;
+  }
   int ret;
   ret = get_image(cam_fd);
   if (ret != OK)

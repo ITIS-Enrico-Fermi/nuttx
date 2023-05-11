@@ -612,36 +612,9 @@ int cxd56_bringup(void)
     }
 #endif
 
-#if defined (CONFIG_MMCSD) && defined (CONFIG_MMCSD_SPI)
-  /* Enable cs of sd card */
-  finfo("Enabling SD card CS pin\n");
-  board_gpio_write(PIN_UART2_RTS, 0);
-  usleep(10);
-  board_gpio_write(PIN_UART2_RTS, 1);
-
-  /* Get the SPI driver instance for the SD chip select */
-  finfo("Initializing SPI for the MMC/SD slot\n");
-
-  ret = mmcsd_spislotinitialize(0, 0, spi);
-  if (ret < 0)
-    {
-      ferr("ERROR: Failed to bind SPI device to MMC/SD slot %d: %d\n",
-           0, ret);
-      return ret;
-    }
-
-  /* Mount filesystem */
-  ret = nx_mount("/dev/mmcsd0", "/mnt/sd0", "vfat", 0, NULL);
-  if (ret < 0)
-    {
-      _err("ERROR: Failed to mount the SDCARD. %d\n", ret);
-    }
-
-#endif
-
 /* REGISTER SPI5 RFM95 CUSTOM SPI DRIVER */
 #if defined(CONFIG_SPI) && defined(CONFIG_RF_RFM95)
-  sninfo("Initializing spi5 for rfm95..\n");
+  sninfo("Initializing spi for rfm95..\n");
   ret = rfm95_register("/dev/radio0", spi, 0);
   if (ret < 0)
     {
